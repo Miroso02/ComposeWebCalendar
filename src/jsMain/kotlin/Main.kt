@@ -1,15 +1,32 @@
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
+import kotlinx.browser.window
+import kotlinx.coroutines.flow.collect
 import org.jetbrains.compose.web.renderComposable
+import service.EventService
+import service.EventServiceImpl
+import service.api.ApiClient
 import kotlin.js.Date
 
 fun main() {
+    val eventService: EventService = EventServiceImpl(ApiClient)
+    val viewModel = MainViewModel(eventService)
     var currentMonth: Date by mutableStateOf(Date())
-    val events = mutableListOf<Event>()
     var selectedDay: Date? by mutableStateOf(null)
 
     renderComposable(rootElementId = "root") {
+        val scope = rememberCoroutineScope()
+        val events by viewModel.events.collectAsState()
+
+        LaunchedEffect(Unit) {
+            viewModel.errorEvent.collect {
+                window.alert(it.stackTraceToString())
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            viewModel.getEvents(scope)
+        }
+
         Legend(
             currentMonth = currentMonth,
             onPrevMonth = {
@@ -28,7 +45,7 @@ fun main() {
             DayInfo(
                 date = date,
                 events = events.filter { it.date.toDateString() == date.toDateString() },
-                onEventAdded = { events.add(it) }
+                onEventAdded = { viewModel.addEvent(scope, it) }
             )
         }
     }
